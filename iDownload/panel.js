@@ -65,7 +65,7 @@ var taskName = "Qdownload_" + Math.floor(Math.random()*1000000);
 function createChannel() {
     //Create a port with background page for continous message communication
     port = chrome.extension.connect({name: taskName});
-    
+
     // Listen to messages from the background page
     port.onMessage.addListener(function (message) {
       if(message.method && message.tabId){
@@ -128,7 +128,7 @@ var downloadSize = 0;//下载的总文件大小
 //i18n
 function txtInit(){
 
-    
+
 
 
         $("#btnMode").text(chrome.i18n.getMessage( "mode" ));
@@ -199,12 +199,12 @@ function btnInit()
         if(detectType==1){
             detectType=0;
             $(".downloadStatus").show().html("<p>"+chrome.i18n.getMessage( "modeChanged" )+"<span style='color:#EB3941'>"+chrome.i18n.getMessage( "mod1" )+"</span></p><p>"+chrome.i18n.getMessage( "tip1" )+"</p>");
-            $("#btnStop").hide(); 
+            $("#btnStop").hide();
         }
         else{
             detectType=1;
             $(".downloadStatus").show().html("<p>"+chrome.i18n.getMessage( "modeChanged" )+"<span style='color:#EB3941'>"+chrome.i18n.getMessage( "mod2" )+"</span></p><p>"+chrome.i18n.getMessage( "tip2" )+"</p>");
-            $("#btnStop").show(); 
+            $("#btnStop").show();
         }
     })
 
@@ -268,7 +268,7 @@ function handleGetSelectedTab(url){
         $(".downloadStatus").show().html("");
 
         //各种数据初始化
-        config = { loadingTimeout: $("[name='config_load_timeout']").val() , 
+        config = { loadingTimeout: $("[name='config_load_timeout']").val() ,
                     downloadTimeout:$("[name='config_download_timeout']").val(),
                     logFlag:$("[name='config_report']:checked").val() };
         downloadStatus=enumStatus.start;
@@ -411,7 +411,7 @@ ZipFile.init = function(url){
     if(zipName.lastIndexOf("/") == zipName.length-1){
         zipName = zipName.substring(0,zipName.length-1);
     }
-    
+
 
     //文件禁用的符号 转换一下
     zipName = zipName.replace(/http:\/\//ig,"");
@@ -470,35 +470,15 @@ ZipFile.add = function(i){
     if(i<filelist.length){
         if(filelist[i][1]==1){
             downloadSize += filelist[i][6];
-            var fileName = fileNameDuplicateRemove(filelist[i][0],filelist[i][4]+"."+filelist[i][5]);
+            console.log(filelist[i][4])
+            var fileName = filelist[i][4]
             //根据文件类型保存
-            if(fileSaveType==1){
-                if(filelist[i][5] == "html" || filelist[i][5] == "htm" || filelist[i][5] == "xml")
-                    fileName=fileName;
-                else if(filelist[i][5] == "css")
-                    fileName="css/"+fileName;
-                else if(filelist[i][5] == "js" || filelist[i][5] == "json")
-                    fileName="js/"+fileName; 
-                else if(filelist[i][5] == "png" || filelist[i][5] == "jpg" || filelist[i][5] == "jpeg" || filelist[i][5] == "bpm" || filelist[i][5] == "gif" || filelist[i][5] == "webp" || filelist[i][5] == "ico")
-                    fileName="image/"+fileName;
-                else if(filelist[i][5] == "woff" || filelist[i][5] == "ttf")
-                    fileName="font/"+fileName;
-                else if(filelist[i][5] == "mp3" || filelist[i][5] == "mp4" || filelist[i][5] == "avi" || filelist[i][5] == "ogg" || filelist[i][5] == "webm" || filelist[i][5] == "ogv" || filelist[i][5] == "swf")
-                    fileName="media/"+fileName;
-                else
-                    fileName="other/"+fileName;
-            }
 
             //规避重名文件：以上逻辑做了比较多的重名过滤，如果还存在极端条件下的重复文件，直接跳过
-            if(zipFilelist.indexOf(fileName)>=0){
+            zipFilelist.push(fileName);
+            global_zipWriter.add(fileName, new zip.Data64URIReader(filelist[i][3]), function() {
                 ZipFile.add(i+1);
-            }
-            else{
-                zipFilelist.push(fileName);
-                global_zipWriter.add(fileName, new zip.Data64URIReader(filelist[i][3]), function() {
-                    ZipFile.add(i+1);
-                });
-            }
+            });
         }
         else{
             ZipFile.add(i+1);
@@ -543,7 +523,7 @@ ZipFile.saveHistory = function(){
 //保存zip并下载
 ZipFile.save = function(){
     // alert("save")
-    
+
     var downloadButton = document.getElementById("btnDownload");
     global_zipWriter.close(function(blob) {
         var blobURL = URL.createObjectURL(blob);
@@ -609,7 +589,7 @@ var typeData = [
     //js
     {type:"js",prefix:["text/javascript","application/javascript","application/x-javascript"]},
     {type:"json",prefix:["application/json"]},
-    
+
     //css
     {type:"css",prefix:["text/css"]},
 
@@ -646,7 +626,7 @@ function getFileName(url){
     var fullname = url;
     fullname=urlFilterProtol(fullname);
     if(fullname.indexOf('?')>0)fullname=fullname.substring(0,fullname.indexOf('?'));//先去除?后面的参数
-    
+
 
     //根据文件类型保存
     if(fileSaveType==1){
@@ -670,9 +650,59 @@ function getFileName(url){
         }
 
     }
-
+    console.log(fileType)
     //对于可统译类型的文件，添加后缀html
-    return {fullname:fullname,name:fileName,type:fileType};
+    return {fullname:fullname,name: getFilePath(url) + getProperName(fileType, url),type: fileType};
+}
+var g_fileName = [];
+
+function getProperName(type, name) {
+	var t = {
+		"script": ".js",
+		"stylesheet": ".css",
+		"main_frame": ".html",
+		"image": ".gif",
+	};
+	//get real name
+	var url = name.split("?")[0];
+	var pos = url.lastIndexOf("/");
+	if (pos == -1) pos = url.lastIndexOf("\\")
+	var filename = url.substr(pos + 1);
+
+	if (filename.trim() == "") {
+		filename = (new Date()).getTime() + "";
+	}
+
+	var tArr = filename.split(".");
+	if (tArr.length == 1) {
+		filename = filename + (t[type] || '.html');
+	}
+
+	// 这里应该加入路径检测，才正常的，不过，关我神马事呢，现在
+	if (g_fileName.indexOf(filename) == -1) {
+		g_fileName.push(filename);
+	} else {
+		// 如果有重复名字，给一个时间戳
+		// 虽然现在理论上，比较少可能有相同名字
+		filename = filename.replace(/([^.]+)\./, "$1_" + (new Date()).getTime() + ".");
+		g_fileName.push(filename);
+	}
+
+
+	return filename;
+}
+
+function getFilePath(path) {
+	var newPath = path ? path.replace(/(?:https?|ftp):\/\/(.+)/g, '$1') : "";
+	var index = newPath.indexOf("?");
+	if (index > 0) {
+		newPath = newPath.slice(0, index);
+	}
+	var arr = newPath.split("/");
+	var last = arr.length;
+	// 如果“/”是最后的一个字母，就不要处理之~
+	(newPath.lastIndexOf("/") + 1) == newPath.length ? true : arr[last - 1] = "";
+	return arr.join("/");
 }
 
 //去除协议头，及最后的斜杠
@@ -687,15 +717,3 @@ function urlFilterProtol(url)
 function onerror(message) {
     console.error(message);
 }
-
-
-
-
-
-
-
-
-
-
-
-
